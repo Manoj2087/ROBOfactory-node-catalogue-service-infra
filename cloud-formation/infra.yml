@@ -55,7 +55,6 @@ Parameters:
     Type: Number
     Default: '6'
     Description: Maximum number of EC2 instances that can be launched in your ECS cluster.
-
 #Build AWs resources
 Resources:
   # Network stack
@@ -66,7 +65,6 @@ Resources:
         CidrPrefix: !Ref CidrPrefix
       TemplateURL: https://01-manoj-cloudformation-templates.s3-ap-southeast-2.amazonaws.com/public-templates/network/2-subnet-network.yml
       TimeoutInMinutes: 30
-
   # DynamoDB Table
   RobotCatalogueTable: 
     Type: AWS::DynamoDB::Table
