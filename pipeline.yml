@@ -164,6 +164,7 @@ Resources:
                 StackName: 'test-robofactory-catalogue'
                 TemplateConfiguration: 'SourceArtifact::cloud-formation/test-config.json'
                 TemplatePath: 'SourceArtifact::cloud-formation/infra.yml'
+                OutputFileName: 'DeployTestInfraStackOutput.json'
               OutputArtifacts: 
                 - Name: DeployTestInfraStackOutput
               InputArtifacts:
@@ -202,6 +203,7 @@ Resources:
                 StackName: 'prod-robofactory-catalogue'
                 TemplateConfiguration: 'SourceArtifact::cloud-formation/prod-config.json'
                 TemplatePath: 'SourceArtifact::cloud-formation/infra.yml'
+                OutputFileName: 'DeployProdInfraStackOutput.json'
               OutputArtifacts: 
                 - Name: DeployProdInfraStackOutput
               InputArtifacts:
