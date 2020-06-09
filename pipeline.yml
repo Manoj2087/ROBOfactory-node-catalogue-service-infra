@@ -156,12 +156,12 @@ Resources:
                 Version: '1'
               RunOrder: 1
               Configuration:
-                ActionMode: CREATE_UPDATE
+                ActionMode: REPLACE_ON_FAILURE
                 Capabilities: CAPABILITY_IAM
                 ParameterOverrides: |
                   {}
                 RoleArn: !GetAtt MyCloudFormationRole.Arn
-                StackName: 'test-robofactory-catalogue'
+                StackName: !Sub test-${AWS::StackName}
                 TemplateConfiguration: 'SourceArtifact::cloud-formation/test-config.json'
                 TemplatePath: 'SourceArtifact::cloud-formation/infra.yml'
                 OutputFileName: 'DeployTestInfraStackOutput.json'
@@ -200,7 +200,7 @@ Resources:
                 ParameterOverrides: |
                   {}
                 RoleArn: !GetAtt MyCloudFormationRole.Arn
-                StackName: 'prod-robofactory-catalogue'
+                StackName: !Sub prod-${AWS::StackName}
                 TemplateConfiguration: 'SourceArtifact::cloud-formation/prod-config.json'
                 TemplatePath: 'SourceArtifact::cloud-formation/infra.yml'
                 OutputFileName: 'DeployProdInfraStackOutput.json'
