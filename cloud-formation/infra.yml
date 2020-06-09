@@ -1,0 +1,260 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Deploy infra'
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+    - Label:
+        default: 'Stack Inputs'
+      Parameters:
+      - CidrPrefix
+      - EnvName
+      - InstanceType
+      - ECSAMI
+      - EC2KeyPair
+      - DesiredCapacity
+      - MaxSize
+#Input Parameters
+Parameters:
+  #CidrPrefix
+  CidrPrefix:
+    Default: 10.200
+    NoEcho: false
+    Description: First 16 bit e.g. 10.200
+    Type: String
+  EnvName:
+    Default: test
+    NoEcho: false
+    Description: Name of the Env to be used.
+    Type: String
+    AllowedValues: 
+      - 'test'
+      - 'prod'
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t3.large
+    Description: Class of EC2 instance used to host containers.
+    AllowedValues: [ t3.micro, t3.small, t3.medium, t3.large, t3.xlarge, t3.2xlarge,
+     m5.large, m5.xlarge, m5.2large, m5.4xlarge, m5.12xlarge, m5.24large,
+     c5.large, c5.xlarge, c5.2xlarge, c5.4xlarge, c5.9xlarge, c5.18xlarge,
+     r5.large, r5.xlarge, r5.2xlarge, r5.4xlarge, r5.12xlarge, r5.24xlarge ]
+    ConstraintDescription: Please choose a valid instance type.
+  ECSAMI:
+    Description: AMI ID
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id
+    Description: The Amazon Machine Image ID used for the cluster, leave it as the default value to get the latest AMI
+  EC2KeyPair: 
+    Description: Amazon EC2 Key Pair
+    Type: "AWS::EC2::KeyPair::KeyName"
+  DesiredCapacity:
+    Type: Number
+    Default: '3'
+    Description: Number of EC2 instances to launch in your ECS cluster.
+  MaxSize:
+    Type: Number
+    Default: '6'
+    Description: Maximum number of EC2 instances that can be launched in your ECS cluster.
+
+#Build AWs resources
+Resources:
+  # Network stack
+  NetworkStack:
+    Type: AWS::CloudFormation::Stack
+    Properties: 
+      Parameters: 
+        CidrPrefix: !Ref CidrPrefix
+      TemplateURL: https://01-manoj-cloudformation-templates.s3-ap-southeast-2.amazonaws.com/public-templates/network/2-subnet-network.yml
+      TimeoutInMinutes: 30
+
+  # DynamoDB Table
+  RobotCatalogueTable: 
+    Type: AWS::DynamoDB::Table
+    Properties: 
+      TableName:
+        Fn::Join:
+          - '-'
+          - - !Ref EnvName
+            - 'robot-catalogue'
+      AttributeDefinitions: 
+        - 
+          AttributeName: "R_NAME"
+          AttributeType: "S"
+        - 
+          AttributeName: "R_TYPE"
+          AttributeType: "S"
+      KeySchema: 
+        - 
+          AttributeName: "R_NAME"
+          KeyType: "HASH"
+      ProvisionedThroughput: 
+        ReadCapacityUnits: "5"
+        WriteCapacityUnits: "5"
+      GlobalSecondaryIndexes: 
+        - 
+          IndexName: 
+            Fn::Join:
+              - '-'
+              - - !Ref EnvName
+                - 'type-index'
+          KeySchema: 
+            - 
+              AttributeName: "R_TYPE"
+              KeyType: "HASH"
+          Projection: 
+            NonKeyAttributes: 
+              - "R_NAME"
+              - "R_IMG_URL"
+            ProjectionType: "INCLUDE"
+          ProvisionedThroughput: 
+            ReadCapacityUnits: "5"
+            WriteCapacityUnits: "5"
+      Tags: 
+      - Key: Name
+        Value:
+          Fn::Join:
+          - '-'
+          - - !Ref EnvName
+            - !Ref AWS::StackName
+            - robot-catalogue-table
+  # DynamoDB Endpoint
+  DynamoDBEndpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: "*"
+            Principal: "*"
+            Resource: "*"
+      RouteTableIds:
+        - Fn::GetAtt: [NetworkStack, Outputs.PrivateRouteTableId]
+      ServiceName: !Sub com.amazonaws.${AWS::Region}.dynamodb
+      VpcId: 
+        Fn::GetAtt: [NetworkStack, Outputs.VPCId]
+  # ECS Cluster
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties: 
+      ClusterName: 
+        Fn::Join:
+          - '-'
+          - - !Ref EnvName
+            - !Ref AWS::StackName
+            - 'cluster'
+  # EC2 instance profile
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: /
+      Roles: [!Ref 'EC2Role']
+  # EC2 Role
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [ec2.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+      - PolicyName: ecs-service
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+              - 'ecs:CreateCluster'
+              - 'ecs:DeregisterContainerInstance'
+              - 'ecs:DiscoverPollEndpoint'
+              - 'ecs:Poll'
+              - 'ecs:RegisterContainerInstance'
+              - 'ecs:StartTelemetrySession'
+              - 'ecs:Submit*'
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'
+              - 'ecr:GetAuthorizationToken'
+              - 'ecr:BatchGetImage'
+              - 'ecr:GetDownloadUrlForLayer'
+            Resource: '*'
+  ContainerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Access to the ECS hosts that run containers
+      VpcId:
+        Fn::GetAtt: [NetworkStack, Outputs.VPCId]
+  # Launch Template
+  ECSLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties: 
+      LaunchTemplateData: 
+        IamInstanceProfile: 
+          Name: !Ref EC2InstanceProfile
+        ImageId: !Ref ECSAMI
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref EC2KeyPair
+        SecurityGroupIds: 
+          - !Ref 'ContainerSecurityGroup'
+        TagSpecifications: 
+          - ResourceType: instance
+            Tags: 
+            - Key: Name
+              Value:
+                Fn::Join:
+                - '-'
+                - - !Ref EnvName
+                  - !Ref AWS::StackName
+          - ResourceType: volume
+            Tags: 
+            - Key: Name
+              Value:
+                Fn::Join:
+                - '-'
+                - - !Ref EnvName
+                  - !Ref AWS::StackName
+        UserData: 
+          Fn::Base64: !Sub |
+            #!/bin/bash -xe
+            echo ECS_CLUSTER=${ECSCluster} >> /etc/ecs/ecs.config
+            yum install -y aws-cfn-bootstrap
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource ECSAutoScalingGroup --region ${AWS::Region}
+  # Autoscaling Group
+  ECSAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier:
+        - Fn::GetAtt: [NetworkStack, Outputs.PrivateSubnetAId]
+        - Fn::GetAtt: [NetworkStack, Outputs.PrivateSubnetBId]
+      LaunchTemplate: 
+        LaunchTemplateId: !Ref ECSLaunchTemplate
+        Version: !GetAtt ECSLaunchTemplate.LatestVersionNumber
+      MinSize: '1'
+      MaxSize: !Ref 'MaxSize'
+      DesiredCapacity: !Ref DesiredCapacity
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+    UpdatePolicy:
+      AutoScalingReplacingUpdate:
+        WillReplace: 'true'
+# Output
+Outputs:
+  StackName:
+    Description: 'Stack name'
+    Value: !Sub '${AWS::StackName}'
+  VPCId:
+    Description: 'VPC ID'
+    Value: 
+      Fn::GetAtt: [NetworkStack, Outputs.VPCId]
+  RobotCatalogueTableName:
+    Description: 'Robot Catalogue DynamoDB TableName'
+    Value: !Ref RobotCatalogueTable 
+  RobotCatalogueTypeIndexName:
+    Description: 'Robot Catalogue Type Index Name'
+    Value: 
+      Fn::Join:
+      - '-'
+      - - !Ref EnvName
+        - 'type-index' 

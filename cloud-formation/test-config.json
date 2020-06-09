@@ -1,0 +1,13 @@
+{
+  "Parameters" : {
+    "CidrPrefix" : "10.1",
+    "EnvName": "test",
+    "InstanceType": "t3.medium",
+    "EC2KeyPair": "test-robofactory-catalogue",
+    "DesiredCapacity": "2",
+    "MaxSize": "4"
+  },
+  "Tags" : {
+    "Name" : "test-robofactory-catalogue"
+  }
+}

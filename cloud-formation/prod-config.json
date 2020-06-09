@@ -1,0 +1,13 @@
+{
+  "Parameters" : {
+    "CidrPrefix" : "10.1",
+    "EnvName": "prod",
+    "InstanceType": "m5.medium",
+    "EC2KeyPair": "prod-robofactory-catalogue",
+    "DesiredCapacity": "2",
+    "MaxSize": "4"
+  },
+  "Tags" : {
+    "Name" : "prod-robofactory-catalogue"
+  }
+}

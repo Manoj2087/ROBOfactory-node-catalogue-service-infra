@@ -1,0 +1,227 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Deploy infra codepipline'
+Metadata:
+  'AWS::CloudFormation::Interface':
+    ParameterGroups:
+    - Label:
+        default: 'GitHub Info'
+      Parameters:
+      - GitHubOwner
+      - RepositoryName
+      - BranchName
+    - Label:
+        default: 'Codebuild'
+      Parameters:
+      - MyAppBuildSpecPath
+#Input Parameters
+Parameters:
+  MyAppName:
+    Default: 'robofactory'
+    Description: 'My App name'
+    Type: String
+  MyAppBuildSpecPath:
+    Default: 'buildspec.yml'
+    Description: 'Location of the buildspec file in your project'
+    Type: String
+  RepositoryName:
+    Description: GitHub repository name
+    Type: String
+    Default: test
+  BranchName:
+    Description: GitHub branch name
+    Type: String
+    Default: master
+  GitHubOwner:
+    Type: String
+  
+#Build AWs resources
+Resources:
+  MyCodeBuildLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      RetentionInDays: 7
+  MyCodeBuildLogStream:
+    Type: AWS::Logs::LogStream
+    Properties: 
+      LogGroupName: !Ref MyCodeBuildLogGroup
+      LogStreamName: "MyAppLogStream"
+  MyCodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [codebuild.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+      - PolicyName: codebuild
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: '*'
+            Resource: '*'
+  MyCloudFormationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [cloudformation.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+      - PolicyName: codebuild
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: '*'
+            Resource: '*'
+  MyTestCodeBuild:
+    Type: AWS::CodeBuild::Project
+    Properties: 
+      Artifacts: 
+        OverrideArtifactName: true
+        Type: 'CODEPIPELINE'
+      Description: 'my app codebuild'
+      Environment: 
+        ComputeType: 'BUILD_GENERAL1_SMALL'
+        Image: 'aws/codebuild/amazonlinux2-x86_64-standard:3.0'
+        PrivilegedMode: false
+        Type: 'LINUX_CONTAINER'
+      LogsConfig: 
+        CloudWatchLogs: 
+          GroupName: !Ref MyCodeBuildLogGroup
+          Status: 'ENABLED'
+          StreamName: !Ref MyCodeBuildLogStream
+      ServiceRole: !Ref MyCodeBuildRole
+      Source: 
+        Type: 'CODEPIPELINE'
+        BuildSpec: !Ref MyAppBuildSpecPath
+  MyAppCodePipelineS3ArtifactStore:
+    Type: AWS::S3::Bucket
+  MyCodePipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: [codepipeline.amazonaws.com]
+          Action: ['sts:AssumeRole']
+      Path: /
+      Policies:
+      - PolicyName: codepipeline
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action: '*'
+            Resource: '*'
+  MyAppCodePipeline:
+    Type: AWS::CodePipeline::Pipeline
+    Properties: 
+      ArtifactStore: 
+        Location: !Ref MyAppCodePipelineS3ArtifactStore
+        Type: 'S3'
+      RoleArn: !GetAtt MyCodePipelineRole.Arn
+      Stages: 
+        - Name: 'Source'
+          # https://docs.aws.amazon.com/codepipeline/latest/userguide/reference-pipeline-structure.html#actions-valid-providers
+          Actions:
+            - Name: ApplicationSource
+              ActionTypeId: 
+                Category: 'Source'
+                Owner: 'ThirdParty'
+                Provider: 'GitHub'
+                Version: '1'
+              Configuration: 
+                Owner: !Ref GitHubOwner
+                Repo: !Ref RepositoryName
+                PollForSourceChanges: false
+                Branch: !Ref BranchName
+                OAuthToken: '{{resolve:secretsmanager:my-app-secrets:SecretString:git-personal-access-token}}'
+              InputArtifacts: []
+              OutputArtifacts: 
+                - Name: SourceArtifact
+              RunOrder: 1
+        - Name: 'Test'
+          Actions:
+            - Name: DeployTestInfra
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              RunOrder: 1
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                Capabilities: CAPABILITY_IAM
+                ParameterOverrides: |
+                  {}
+                RoleArn: !GetAtt MyCloudFormationRole.Arn
+                StackName: 'test-robofactory-catalogue'
+                TemplateConfiguration: 'SourceArtifact::cloud-formation/test-config.json'
+                TemplatePath: 'SourceArtifact::cloud-formation/infra.yml'
+              OutputArtifacts: 
+                - Name: DeployTestInfraStackOutput
+              InputArtifacts:
+                - Name: SourceArtifact
+            - Name: RunTests
+              ActionTypeId:
+                Category: Build
+                Owner: AWS
+                Provider: CodeBuild
+                Version: '1'
+              Configuration:
+                ProjectName: !Ref MyTestCodeBuild
+                PrimarySource: SourceArtifact
+                EnvironmentVariables: |
+                  []
+              OutputArtifacts:
+                - Name: BuildArtifact
+              InputArtifacts:
+                - Name: SourceArtifact
+              RunOrder: 2
+        - Name: 'Prod'
+          Actions:
+            - Name: DeployProdInfra
+              ActionTypeId:
+                Category: Deploy
+                Owner: AWS
+                Provider: CloudFormation
+                Version: '1'
+              RunOrder: 1
+              Configuration:
+                ActionMode: CREATE_UPDATE
+                Capabilities: CAPABILITY_IAM
+                ParameterOverrides: |
+                  {}
+                RoleArn: !GetAtt MyCloudFormationRole.Arn
+                StackName: 'prod-robofactory-catalogue'
+                TemplateConfiguration: 'SourceArtifact::cloud-formation/prod-config.json'
+                TemplatePath: 'SourceArtifact::cloud-formation/infra.yml'
+              OutputArtifacts: 
+                - Name: DeployProdInfraStackOutput
+              InputArtifacts:
+                - Name: SourceArtifact
+  MyAppGitHubWebHook:
+    Type: AWS::CodePipeline::Webhook
+    Properties: 
+      Authentication: 'GITHUB_HMAC'
+      AuthenticationConfiguration: 
+        SecretToken: '{{resolve:secretsmanager:my-app-secrets:SecretString:git-personal-access-token}}'
+      Filters: 
+        - JsonPath: $.ref
+          MatchEquals: 'refs/heads/{Branch}'
+      Name: 'AppPipelineWebhook'
+      RegisterWithThirdParty: true
+      TargetAction: 'ApplicationSource'
+      TargetPipeline: !Ref MyAppCodePipeline
+      TargetPipelineVersion: !GetAtt MyAppCodePipeline.Version
+
+Outputs:
+  StackName:
+    Description: 'Stack name'
+    Value: !Sub '${AWS::StackName}'
