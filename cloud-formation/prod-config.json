@@ -2,7 +2,7 @@
   "Parameters" : {
     "CidrPrefix" : "10.1",
     "EnvName": "prod",
-    "InstanceType": "m5.medium",
+    "InstanceType": "m5.large",
     "EC2KeyPair": "prod-robofactory-catalogue",
     "DesiredCapacity": "2",
     "MaxSize": "4"
