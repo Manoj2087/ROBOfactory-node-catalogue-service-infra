@@ -30,7 +30,6 @@ Parameters:
       - 'test'
       - 'prod'
   InstanceType:
-    Description: EC2 instance type
     Type: String
     Default: t3.large
     Description: Class of EC2 instance used to host containers.
@@ -40,7 +39,6 @@ Parameters:
      r5.large, r5.xlarge, r5.2xlarge, r5.4xlarge, r5.12xlarge, r5.24xlarge ]
     ConstraintDescription: Please choose a valid instance type.
   ECSAMI:
-    Description: AMI ID
     Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
     Default: /aws/service/ecs/optimized-ami/amazon-linux-2/recommended/image_id
     Description: The Amazon Machine Image ID used for the cluster, leave it as the default value to get the latest AMI
@@ -65,56 +63,6 @@ Resources:
         CidrPrefix: !Ref CidrPrefix
       TemplateURL: https://01-manoj-cloudformation-templates.s3-ap-southeast-2.amazonaws.com/public-templates/network/2-subnet-network.yml
       TimeoutInMinutes: 30
-  # DynamoDB Table
-  RobotCatalogueTable: 
-    Type: AWS::DynamoDB::Table
-    Properties: 
-      TableName:
-        Fn::Join:
-          - '-'
-          - - !Ref EnvName
-            - 'robot-catalogue'
-      AttributeDefinitions: 
-        - 
-          AttributeName: "R_NAME"
-          AttributeType: "S"
-        - 
-          AttributeName: "R_TYPE"
-          AttributeType: "S"
-      KeySchema: 
-        - 
-          AttributeName: "R_NAME"
-          KeyType: "HASH"
-      ProvisionedThroughput: 
-        ReadCapacityUnits: "5"
-        WriteCapacityUnits: "5"
-      GlobalSecondaryIndexes: 
-        - 
-          IndexName: 
-            Fn::Join:
-              - '-'
-              - - !Ref EnvName
-                - 'type-index'
-          KeySchema: 
-            - 
-              AttributeName: "R_TYPE"
-              KeyType: "HASH"
-          Projection: 
-            NonKeyAttributes: 
-              - "R_NAME"
-              - "R_IMG_URL"
-            ProjectionType: "INCLUDE"
-          ProvisionedThroughput: 
-            ReadCapacityUnits: "5"
-            WriteCapacityUnits: "5"
-      Tags: 
-      - Key: Name
-        Value:
-          Fn::Join:
-          - '-'
-          - - !Ref EnvName
-            - !Ref AWS::StackName
-            - robot-catalogue-table
   # DynamoDB Endpoint
   DynamoDBEndpoint:
     Type: AWS::EC2::VPCEndpoint
@@ -236,7 +184,7 @@ Resources:
         Timeout: PT15M
     UpdatePolicy:
       AutoScalingReplacingUpdate:
-        WillReplace: 'true'
+        WillReplace: true
 # Output
 Outputs:
   StackName:
@@ -246,13 +194,3 @@ Outputs:
     Description: 'VPC ID'
     Value: 
       Fn::GetAtt: [NetworkStack, Outputs.VPCId]
-  RobotCatalogueTableName:
-    Description: 'Robot Catalogue DynamoDB TableName'
-    Value: !Ref RobotCatalogueTable 
-  RobotCatalogueTypeIndexName:
-    Description: 'Robot Catalogue Type Index Name'
-    Value: 
-      Fn::Join:
-      - '-'
-      - - !Ref EnvName
-        - 'type-index' 

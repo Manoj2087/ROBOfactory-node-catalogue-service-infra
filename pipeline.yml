@@ -15,10 +15,6 @@ Metadata:
       - MyAppBuildSpecPath
 #Input Parameters
 Parameters:
-  MyAppName:
-    Default: 'robofactory'
-    Description: 'My App name'
-    Type: String
   MyAppBuildSpecPath:
     Default: 'buildspec.yml'
     Description: 'Location of the buildspec file in your project'
@@ -217,7 +213,6 @@ Resources:
       Filters: 
         - JsonPath: $.ref
           MatchEquals: 'refs/heads/{Branch}'
-      Name: 'AppPipelineWebhook'
       RegisterWithThirdParty: true
       TargetAction: 'ApplicationSource'
       TargetPipeline: !Ref MyAppCodePipeline
