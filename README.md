@@ -29,7 +29,7 @@ NOTE: make sure EC2KeyPair is availabe in the account.
 # Create\update
 aws cloudformation deploy \
 --template-file cloud-formation/infra.yml \
---stack-name node-robot-catalogue-service-infra \
+--stack-name dev-node-robot-catalogue-service-infra \
 --parameter-overrides \
 ProjectName=robofactory \
 CidrPrefix=10.10 \
