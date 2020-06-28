@@ -223,3 +223,8 @@ Outputs:
       Fn::GetAtt: [NetworkStack, Outputs.PrivateSubnetBId]
     Export:
       Name: !Join [ ":", [ !Ref "AWS::StackName", PrivateSubnetBId ] ]
+  ECSClusterArn:
+    Description: 'ECS Cluster ARN'
+    Value: !GetAtt ECSCluster.Arn
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", ECSClusterARN ] ]    
