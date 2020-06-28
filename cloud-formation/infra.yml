@@ -197,3 +197,29 @@ Outputs:
     Description: 'VPC ID'
     Value: 
       Fn::GetAtt: [NetworkStack, Outputs.VPCId]
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", VPCID ] ]
+  PublicSubnetAId:
+    Description: 'PublicSubnetAId'
+    Value: 
+      Fn::GetAtt: [NetworkStack, Outputs.PublicSubnetAId]
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", PublicSubnetAId ] ]
+  PublicSubnetBId:
+    Description: 'PublicSubnetBId'
+    Value: 
+      Fn::GetAtt: [NetworkStack, Outputs.PublicSubnetBId]
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", PublicSubnetBId ] ]
+  PrivateSubnetAId:
+    Description: 'PrivateSubnetAId'
+    Value: 
+      Fn::GetAtt: [NetworkStack, Outputs.PrivateSubnetAId]
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", PrivateSubnetAId ] ]
+  PrivateSubnetBId:
+    Description: 'PrivateSubnetBId'
+    Value: 
+      Fn::GetAtt: [NetworkStack, Outputs.PrivateSubnetBId]
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", PrivateSubnetBId ] ]
