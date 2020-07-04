@@ -128,7 +128,7 @@ Resources:
               - 'logs:CreateLogStream'
               - 'logs:PutLogEvents'
             Resource: '*'
-  ContainerSecurityGroup:
+  EC2SecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: Access to the ECS hosts that run containers
@@ -145,7 +145,7 @@ Resources:
         InstanceType: !Ref InstanceType
         KeyName: !Ref EC2KeyPair
         SecurityGroupIds: 
-          - !Ref 'ContainerSecurityGroup'
+          - !Ref 'EC2SecurityGroup'
         TagSpecifications: 
           - ResourceType: instance
             Tags: 
@@ -227,4 +227,9 @@ Outputs:
     Description: 'ECS Cluster ARN'
     Value: !GetAtt ECSCluster.Arn
     Export:
-      Name: !Join [ ":", [ !Ref "AWS::StackName", ECSClusterARN ] ]    
+      Name: !Join [ ":", [ !Ref "AWS::StackName", ECSClusterARN ] ]
+  ECSEC2SG:
+    Description: 'ECS EC2 security group'
+    Value: !Ref 'EC2SecurityGroup'
+    Export:
+      Name: !Join [ ":", [ !Ref "AWS::StackName", ECSEC2SG ] ]
